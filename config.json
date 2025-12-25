@@ -1,14 +1,28 @@
 {
-  "wechat_webhook": "YOUR_WECHAT_WEBHOOK_URL",
+  "dingtalk_webhook": "https://oapi.dingtalk.com/robot/send?access_token=4ea5c66eba849d515745469f22ca3c800379d7a861a6b08514fda925f68c97b1",
+  "dingtalk_secret": "SECRET",  // 可选，加签密钥
   "news_sources": {
     "international_media": [
       {
         "name": "TechCrunch",
         "url": "https://techcrunch.com/feed/",
         "keywords": ["AI", "artificial intelligence", "machine learning", "GPT", "OpenAI", "LLM"]
-      },
+      }
+    ],
+    "chinese_media": [
       {
-…  },
+        "name": "36氪",
+        "url": "https://36kr.com/feed",
+        "keywords": ["人工智能", "AI", "机器学习", "大模型", "GPT"]
+      }
+    ]
+  },
+  "ai_summary": {
+    "api_key": "YOUR_OPENAI_API_KEY",
+    "model": "gpt-3.5-turbo",
+    "max_tokens": 100,
+    "temperature": 0.3
+  },
   "settings": {
     "daily_time": "09:30",
     "max_news": 10,
