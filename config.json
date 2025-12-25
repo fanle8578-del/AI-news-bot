@@ -1,0 +1,19 @@
+{
+  "wechat_webhook": "YOUR_WECHAT_WEBHOOK_URL",
+  "news_sources": {
+    "international_media": [
+      {
+        "name": "TechCrunch",
+        "url": "https://techcrunch.com/feed/",
+        "keywords": ["AI", "artificial intelligence", "machine learning", "GPT", "OpenAI", "LLM"]
+      },
+      {
+…  },
+  "settings": {
+    "daily_time": "09:30",
+    "max_news": 10,
+    "language": "mixed",
+    "timezone": "Asia/Shanghai",
+    "duplicate_check_hours": 24
+  }
+}
