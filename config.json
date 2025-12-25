@@ -1,5 +1,5 @@
 {
-    "dingtalk_webhook": "YOUR_DINGTALK_WEBHOOK_URL",
+    "dingtalk_webhook": "https://oapi.dingtalk.com/robot/send?access_token=4ea5c66eba849d515745469f22ca3c800379d7a861a6b08514fda925f68c97b1",
     "news_sources": {
         "international_media": [
             {
