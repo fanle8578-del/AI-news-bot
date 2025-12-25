@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  ai-news-bot:
+    build: .
+    container_name: ai-news-bot
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./logs:/app/logs
+      - ./sent_urls.json:/app/sent_urls.json
+    # 如果使用定时任务，可以取消下面这行的注释
+    # command: ["python", "-c", "import time; import main; bot = main.AINewsBot(); bot.run_daily_job(); time.sleep(86400)"]
+    
+  # 可选：如果需要定时任务，使用cron服务
+  cron:
+    image: alpine:latest
+    container_name: ai-news-bot-cron
+    restart: unless-stopped
+    volumes:
+      - ./:/workspace
+    command: |
+      sh -c "
+        apk add --no-cache python3 py3-pip
+        pip3 install -r /workspace/requirements.txt
+        echo '30 1 * * * cd /workspace && python3 main.py >> /workspace/logs/cron.log 2>&1' | crontab -
+        crond -f
+      "
