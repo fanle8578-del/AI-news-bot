@@ -1,0 +1,52 @@
+name: AI Daily News Bot
+
+on:
+  schedule:
+    # 每天北京时间09:30 (UTC+8) 执行，即UTC时间01:30
+    - cron: '30 1 * * *'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  daily-news:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Configure environment
+      run: |
+        # 创建必要的目录
+        mkdir -p logs
+        
+        # 如果配置文件中的webhook是占位符，使用secrets
+        if grep -q "YOUR_WECHAT_WEBHOOK_URL" config.json; then
+          sed -i "s|YOUR_WECHAT_WEBHOOK_URL|${{ secrets.WECHAT_WEBHOOK_URL }}|g" config.json
+        fi
+        
+        if grep -q "YOUR_OPENAI_API_KEY" config.json; then
+          sed -i "s|YOUR_OPENAI_API_KEY|${{ secrets.OPENAI_API_KEY }}|g" config.json
+        fi
+        
+    - name: Run AI News Bot
+      run: |
+        python main.py
+        
+    - name: Commit changes
+      if: success()
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add sent_urls.json ai_news_bot.log
+        git commit -m "Update sent URLs and logs" || echo "No changes to commit"
+        git push || echo "Push failed, but continuing"
