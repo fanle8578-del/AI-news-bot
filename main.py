@@ -2,18 +2,19 @@
 # -*- coding: utf-8 -*-
 """
 AI新闻日报机器人主程序
-每日自动聚合AI相关新闻并推送到企业微信
+每日自动聚合AI相关新闻并推送到钉钉
 """
 
 import json
 import logging
 import requests
 import feedparser
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional
-from dataclasses import dataclass
+import hmac
 import hashlib
 import time
+import base64
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 配置日志
@@ -27,6 +28,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class NewsItem:
     """新闻条目数据结构"""
@@ -38,6 +40,7 @@ class NewsItem:
     category: str
     importance_score: float = 0.0
 
+
 class NewsAggregator:
     """新闻聚合器"""
     
@@ -45,7 +48,8 @@ class NewsAggregator:
         with open(config_path, 'r', encoding='utf-8') as f:
             self.config = json.load(f)
         
-        self.webhook_url = self.config["wechat_webhook"]
+        self.webhook_url = self.config["dingtalk_webhook"]
+        self.secret = self.config.get("dingtalk_secret", "")  # 加签密钥（可选）
         self.sent_urls_file = "sent_urls.json"
         self.sent_urls = self._load_sent_urls()
         
@@ -92,7 +96,7 @@ class NewsAggregator:
         # 特殊关键词额外加分
         high_value_keywords = [
             'openai', 'gpt-4', 'claude', 'anthropic', 'funding', 'acquisition',
-            'breakthrough', 'breakthrough', 'research', 'paper'
+            'breakthrough', 'research', 'paper'
         ]
         for keyword in high_value_keywords:
             if keyword in title_lower:
@@ -217,6 +221,7 @@ class NewsAggregator:
         logger.info(f"总共抓取到 {len(all_news)} 条新闻")
         return all_news
 
+
 class AISummarizer:
     """AI新闻摘要器"""
     
@@ -278,11 +283,29 @@ class AISummarizer:
             logger.error(f"AI摘要生成失败: {e}")
             return news_item.summary or "暂无摘要"
 
-class WeChatNotifier:
-    """企业微信通知器"""
+
+class DingTalkNotifier:
+    """钉钉通知器"""
     
-    def __init__(self, webhook_url: str):
+    def __init__(self, webhook_url: str, secret: str = ""):
         self.webhook_url = webhook_url
+        self.secret = secret
+    
+    def _get_sign(self) -> str:
+        """生成签名（如果配置了secret）"""
+        if not self.secret:
+            return ""
+        
+        timestamp = str(int(time.time() * 1000))
+        string_to_sign = f'{timestamp}\n{self.secret}'
+        hmac_code = hmac.new(
+            self.secret.encode('utf-8'),
+            string_to_sign.encode('utf-8'),
+            digestmod=hashlib.sha256
+        ).digest()
+        
+        sign = base64.b64encode(hmac_code).decode('utf-8')
+        return f"&timestamp={timestamp}&sign={sign}"
     
     def send_daily_news(self, news_items: List[NewsItem], date: str) -> bool:
         """发送每日新闻"""
@@ -294,7 +317,8 @@ class WeChatNotifier:
             data = {
                 "msgtype": "markdown",
                 "markdown": {
-                    "content": message
+                    "title": f"AI每日早报 | {date}",
+                    "text": message
                 }
             }
             
@@ -302,20 +326,24 @@ class WeChatNotifier:
                 "Content-Type": "application/json"
             }
             
-            response = requests.post(
-                self.webhook_url,
-                headers=headers,
-                json=data,
-                timeout=30
-            )
+            # 如果配置了secret，添加签名
+            url = self.webhook_url
+            if self.secret:
+                url += self._get_sign()
             
+            response = requests.post(url, headers=headers, json=data, timeout=30)
             response.raise_for_status()
             
-            logger.info("企业微信消息发送成功")
-            return True
+            result = response.json()
+            if result.get("errcode") == 0:
+                logger.info("钉钉消息发送成功")
+                return True
+            else:
+                logger.error(f"钉钉消息发送失败: {result.get('errmsg')}")
+                return False
             
         except Exception as e:
-            logger.error(f"企业微信消息发送失败: {e}")
+            logger.error(f"钉钉消息发送失败: {e}")
             return False
     
     def _build_markdown_message(self, news_items: List[NewsItem], date: str) -> str:
@@ -336,9 +364,10 @@ class WeChatNotifier:
             emoji = self._get_category_emoji(news.category)
             
             # 构建新闻条目
-            news_line = f"{emoji} **{news.title}**\n"
-            news_line += f"   {news.summary}\n"
-            news_line += f"   📰 来源：{news.source} | [🔗原文链接]({news.url})\n"
+            news_line = f"**{emoji} {news.title}**\n"
+            news_line += f"> {news.summary}\n"
+            news_line += f"> 📰 来源：{news.source}\n"
+            news_line += f"> 🔗 [原文链接]({news.url})\n"
             
             message_parts.append(news_line)
         
@@ -359,6 +388,7 @@ class WeChatNotifier:
         }
         return emoji_map.get(category, "📰")
 
+
 class AINewsBot:
     """AI新闻机器人主类"""
     
@@ -366,7 +396,10 @@ class AINewsBot:
         self.config_path = config_path
         self.aggregator = NewsAggregator(config_path)
         self.summarizer = AISummarizer(self.aggregator.config)
-        self.notifier = WeChatNotifier(self.aggregator.webhook_url)
+        self.notifier = DingTalkNotifier(
+            self.aggregator.webhook_url,
+            self.aggregator.secret
+        )
     
     def run_daily_job(self) -> bool:
         """执行每日新闻收集和推送任务"""
@@ -391,7 +424,7 @@ class AINewsBot:
                 news.summary = self.summarizer.generate_summary(news)
                 time.sleep(1)  # 避免API频率限制
             
-            # 4. 发送到企业微信
+            # 4. 发送到钉钉
             current_date = datetime.now().strftime("%Y年%m月%d日")
             success = self.notifier.send_daily_news(selected_news, current_date)
             
@@ -413,6 +446,7 @@ class AINewsBot:
             logger.error(f"执行每日任务时出错: {e}")
             return False
 
+
 def main():
     """主函数"""
     try:
@@ -429,6 +463,7 @@ def main():
     except Exception as e:
         logger.error(f"程序异常: {e}")
         exit(1)
+
 
 if __name__ == "__main__":
     main()
