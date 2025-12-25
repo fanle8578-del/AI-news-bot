@@ -29,16 +29,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class NewsItem:
     """新闻条目数据结构"""
-    title: str
-    summary: str
-    url: str
-    source: str
-    published: datetime
-    category: str
-    importance_score: float = 0.0
+    
+    def __init__(self, title: str, summary: str, url: str, source: str, 
+                 published: datetime, category: str, importance_score: float = 0.0):
+        self.title = title
+        self.summary = summary
+        self.url = url
+        self.source = source
+        self.published = published
+        self.category = category
+        self.importance_score = importance_score
 
 
 class NewsAggregator:
@@ -49,7 +51,7 @@ class NewsAggregator:
             self.config = json.load(f)
         
         self.webhook_url = self.config["dingtalk_webhook"]
-        self.secret = self.config.get("dingtalk_secret", "")  # 加签密钥（可选）
+        self.secret = self.config.get("dingtalk_secret", "")
         self.sent_urls_file = "sent_urls.json"
         self.sent_urls = self._load_sent_urls()
         
@@ -107,9 +109,8 @@ class NewsAggregator:
     def _fetch_rss_feed(self, source: Dict) -> List[NewsItem]:
         """抓取RSS源"""
         try:
-            logger.info(f"正在抓取: {source['name']}")
+            logger.info("正在抓取: " + source['name'])
             
-            # 添加请求头模拟浏览器
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
@@ -120,19 +121,16 @@ class NewsAggregator:
             feed = feedparser.parse(response.content)
             news_items = []
             
-            # 获取24小时内的新闻
             cutoff_time = datetime.now() - timedelta(hours=24)
             
-            for entry in feed.entries[:50]:  # 限制数量避免过多
+            for entry in feed.entries[:50]:
                 try:
-                    # 解析发布时间
                     published = datetime.now()
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         published = datetime(*entry.published_parsed[:6])
                     elif hasattr(entry, 'updated_parsed') and entry.updated_parsed:
                         published = datetime(*entry.updated_parsed[:6])
                     
-                    # 检查是否在时间范围内
                     if published < cutoff_time:
                         continue
                     
@@ -142,21 +140,17 @@ class NewsAggregator:
                     if not title or not url:
                         continue
                     
-                    # 去重检查
                     if self._is_duplicate(url):
                         continue
                     
-                    # 计算重要性评分
                     importance_score = self._calculate_importance_score(
                         title, source.get('keywords', [])
                     )
                     
-                    # 生成摘要
                     summary = getattr(entry, 'summary', '')
                     if not summary and hasattr(entry, 'description'):
                         summary = getattr(entry, 'description', '')
                     
-                    # 清理HTML标签
                     summary = self._clean_html(summary)
                     
                     news_item = NewsItem(
@@ -172,22 +166,20 @@ class NewsAggregator:
                     news_items.append(news_item)
                     
                 except Exception as e:
-                    logger.warning(f"处理新闻条目时出错: {e}")
+                    logger.warning("处理新闻条目时出错: " + str(e))
                     continue
             
-            logger.info(f"从 {source['name']} 抓取到 {len(news_items)} 条新闻")
+            logger.info("从 " + source['name'] + " 抓取到 " + str(len(news_items)) + " 条新闻")
             return news_items
             
         except Exception as e:
-            logger.error(f"抓取 RSS 源失败 {source['name']}: {e}")
+            logger.error("抓取 RSS 源失败 " + source['name'] + ": " + str(e))
             return []
     
     def _clean_html(self, text: str) -> str:
         """清理HTML标签"""
         import re
-        # 移除HTML标签
         text = re.sub(r'<[^>]+>', '', text)
-        # 移除多余的空白字符
         text = re.sub(r'\s+', ' ', text).strip()
         return text
     
@@ -195,9 +187,7 @@ class NewsAggregator:
         """抓取所有新闻源"""
         all_news = []
         
-        # 并发抓取所有新闻源
         with ThreadPoolExecutor(max_workers=5) as executor:
-            # 提交所有任务
             future_to_source = {}
             
             for category, sources in self.config["news_sources"].items():
@@ -206,19 +196,17 @@ class NewsAggregator:
                     future = executor.submit(self._fetch_rss_feed, source)
                     future_to_source[future] = source
             
-            # 收集结果
             for future in as_completed(future_to_source):
                 source = future_to_source[future]
                 try:
                     news_items = future.result()
                     all_news.extend(news_items)
                 except Exception as e:
-                    logger.error(f"获取新闻时出错 {source['name']}: {e}")
+                    logger.error("获取新闻时出错 " + source['name'] + ": " + str(e))
         
-        # 按重要性评分排序
         all_news.sort(key=lambda x: x.importance_score, reverse=True)
         
-        logger.info(f"总共抓取到 {len(all_news)} 条新闻")
+        logger.info("总共抓取到 " + str(len(all_news)) + " 条新闻")
         return all_news
 
 
@@ -234,24 +222,19 @@ class AISummarizer:
     def generate_summary(self, news_item: NewsItem) -> str:
         """使用AI生成新闻摘要"""
         if not self.api_key or self.api_key == "YOUR_OPENAI_API_KEY":
-            # 如果没有API密钥，返回原始摘要
             return news_item.summary or "暂无摘要"
         
         try:
-            prompt = f"""
-请为以下AI相关新闻生成一个简洁的中文摘要，要求：
-1. 长度控制在50字以内
-2. 保留关键信息（公司名、技术名、数据等）
-3. 语言客观专业
-
-新闻标题：{news_item.title}
-新闻内容：{news_item.summary}
-
-请直接输出摘要，不需要其他说明。
-"""
+            prompt = "请为以下AI相关新闻生成一个简洁的中文摘要，要求：\n"
+            prompt += "1. 长度控制在50字以内\n"
+            prompt += "2. 保留关键信息（公司名、技术名、数据等）\n"
+            prompt += "3. 语言客观专业\n\n"
+            prompt += "新闻标题：" + news_item.title + "\n"
+            prompt += "新闻内容：" + news_item.summary + "\n\n"
+            prompt += "请直接输出摘要，不需要其他说明。"
             
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": "Bearer " + self.api_key,
                 "Content-Type": "application/json"
             }
             
@@ -280,7 +263,7 @@ class AISummarizer:
                 return news_item.summary or "暂无摘要"
                 
         except Exception as e:
-            logger.error(f"AI摘要生成失败: {e}")
+            logger.error("AI摘要生成失败: " + str(e))
             return news_item.summary or "暂无摘要"
 
 
@@ -297,7 +280,7 @@ class DingTalkNotifier:
             return ""
         
         timestamp = str(int(time.time() * 1000))
-        string_to_sign = f'{timestamp}\n{self.secret}'
+        string_to_sign = timestamp + "\n" + self.secret
         hmac_code = hmac.new(
             self.secret.encode('utf-8'),
             string_to_sign.encode('utf-8'),
@@ -305,19 +288,17 @@ class DingTalkNotifier:
         ).digest()
         
         sign = base64.b64encode(hmac_code).decode('utf-8')
-        return f"&timestamp={timestamp}&sign={sign}"
+        return "&timestamp=" + timestamp + "&sign=" + sign
     
     def send_daily_news(self, news_items: List[NewsItem], date: str) -> bool:
         """发送每日新闻"""
         try:
-            # 构建Markdown消息
             message = self._build_markdown_message(news_items, date)
             
-            # 发送消息
             data = {
                 "msgtype": "markdown",
                 "markdown": {
-                    "title": f"AI每日早报 | {date}",
+                    "title": "AI每日早报 | " + date,
                     "text": message
                 }
             }
@@ -326,7 +307,6 @@ class DingTalkNotifier:
                 "Content-Type": "application/json"
             }
             
-            # 如果配置了secret，添加签名
             url = self.webhook_url
             if self.secret:
                 url += self._get_sign()
@@ -339,39 +319,32 @@ class DingTalkNotifier:
                 logger.info("钉钉消息发送成功")
                 return True
             else:
-                logger.error(f"钉钉消息发送失败: {result.get('errmsg')}")
+                logger.error("钉钉消息发送失败: " + result.get('errmsg'))
                 return False
             
         except Exception as e:
-            logger.error(f"钉钉消息发送失败: {e}")
+            logger.error("钉钉消息发送失败: " + str(e))
             return False
     
     def _build_markdown_message(self, news_items: List[NewsItem], date: str) -> str:
         """构建Markdown格式的消息"""
         message_parts = []
         
-        # 标题
-        message_parts.append(f"## 📅 AI 每日早报 | {date}")
+        message_parts.append("## 📅 AI 每日早报 | " + date)
+        message_parts.append("")
+        message_parts.append("**今日精选 " + str(len(news_items)) + " 条AI要闻**")
         message_parts.append("")
         
-        # 统计信息
-        message_parts.append(f"**今日精选 {len(news_items)} 条AI要闻**")
-        message_parts.append("")
-        
-        # 新闻列表
         for i, news in enumerate(news_items, 1):
-            # 根据类别选择emoji
             emoji = self._get_category_emoji(news.category)
             
-            # 构建新闻条目
-            news_line = f"**{emoji} {news.title}**\n"
-            news_line += f"> {news.summary}\n"
-            news_line += f"> 📰 来源：{news.source}\n"
-            news_line += f"> 🔗 [原文链接]({news.url})\n"
+            news_line = "**" + emoji + " " + news.title + "**\n"
+            news_line += "> " + news.summary + "\n"
+            news_line += "> 📰 来源：" + news.source + "\n"
+            news_line += "> 🔗 [原文链接](" + news.url + ")\n"
             
             message_parts.append(news_line)
         
-        # 底部信息
         message_parts.append("")
         message_parts.append("---")
         message_parts.append("*本简报由 AI 自动生成，仅供内部参考*")
@@ -406,30 +379,25 @@ class AINewsBot:
         try:
             logger.info("开始执行每日新闻任务")
             
-            # 1. 抓取新闻
             all_news = self.aggregator.fetch_all_news()
             
             if not all_news:
                 logger.warning("未抓取到任何新闻")
                 return False
             
-            # 2. 筛选高质量新闻
             max_news = self.aggregator.config["settings"]["max_news"]
             selected_news = all_news[:max_news]
             
-            logger.info(f"筛选出 {len(selected_news)} 条高质量新闻")
+            logger.info("筛选出 " + str(len(selected_news)) + " 条高质量新闻")
             
-            # 3. 生成AI摘要
             for news in selected_news:
                 news.summary = self.summarizer.generate_summary(news)
-                time.sleep(1)  # 避免API频率限制
+                time.sleep(1)
             
-            # 4. 发送到钉钉
             current_date = datetime.now().strftime("%Y年%m月%d日")
             success = self.notifier.send_daily_news(selected_news, current_date)
             
             if success:
-                # 5. 记录已发送的URL
                 for news in selected_news:
                     self.aggregator.sent_urls.add(
                         self.aggregator._get_url_hash(news.url)
@@ -443,7 +411,7 @@ class AINewsBot:
                 return False
                 
         except Exception as e:
-            logger.error(f"执行每日任务时出错: {e}")
+            logger.error("执行每日任务时出错: " + str(e))
             return False
 
 
@@ -461,7 +429,7 @@ def main():
             exit(1)
             
     except Exception as e:
-        logger.error(f"程序异常: {e}")
+        logger.error("程序异常: " + str(e))
         exit(1)
 
 
