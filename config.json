@@ -1,0 +1,34 @@
+{
+    "dingtalk_webhook": "https://oapi.dingtalk.com/robot/send?access_token=624d19f25ff6171ace71ed2f170726c49f99f38116087d5116adc5816633ec9c",
+    "dingtalk_secret": "SEC6652601f91a2565e552e8084e74edb02bede777f598e69e36503dee40bccd713",
+    "news_sources": {
+        "international_media": [
+            {
+                "name": "TechCrunch",
+                "url": "https://techcrunch.com/feed/",
+                "keywords": [
+                    "AI"
+                ]
+            }
+        ],
+        "chinese_media": [
+            {
+                "name": "机器之心",
+                "url": "https://www.jiqizhixin.com/rss",
+                "keywords": [
+                    "人工智能"
+                ]
+            }
+        ]
+    },
+    "ai_summary": {
+        "api_key": "YOUR_OPENAI_API_KEY",
+        "model": "gpt-3.5-turbo",
+        "max_tokens": 50,
+        "temperature": 0.3
+    },
+    "settings": {
+        "max_news": 5,
+        "duplicate_check_hours": 24
+    }
+}
