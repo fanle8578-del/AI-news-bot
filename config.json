@@ -1,6 +1,6 @@
 {
-  "dingtalk_webhook": "https://oapi.dingtalk.com/robot/send?access_token=4ea5c66eba849d515745469f22ca3c800379d7a861a6b08514fda925f68c97b1",
-  "dingtalk_secret": "SECRET",  // 可选，加签密钥
+  "dingtalk_webhook": "YOUR_DINGTALK_WEBHOOK_URL",
+  "dingtalk_secret": "",
   "news_sources": {
     "international_media": [
       {
@@ -14,6 +14,11 @@
         "name": "36氪",
         "url": "https://36kr.com/feed",
         "keywords": ["人工智能", "AI", "机器学习", "大模型", "GPT"]
+      },
+      {
+        "name": "机器之心",
+        "url": "https://www.jiqizhixin.com/rss",
+        "keywords": ["人工智能", "AI", "机器学习", "深度学习"]
       }
     ]
   },
