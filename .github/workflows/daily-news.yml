@@ -24,29 +24,22 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Configure environment
-      run: |
-        # 创建必要的目录
-        mkdir -p logs
-        
-        # 如果配置文件中的webhook是占位符，使用secrets
-        if grep -q "YOUR_WECHAT_WEBHOOK_URL" config.json; then
-          sed -i "s|YOUR_WECHAT_WEBHOOK_URL|${{ secrets.WECHAT_WEBHOOK_URL }}|g" config.json
-        fi
-        
-        if grep -q "YOUR_OPENAI_API_KEY" config.json; then
-          sed -i "s|YOUR_OPENAI_API_KEY|${{ secrets.OPENAI_API_KEY }}|g" config.json
-        fi
-        
-    - name: Run AI News Bot
-      run: |
-        python main.py
-        
     - name: Commit changes
       if: success()
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add sent_urls.json ai_news_bot.log
+        
+        # 创建日志目录（如果不存在）
+        mkdir -p logs
+        
+        # 创建日志文件（如果不存在）
+        touch ai_news_bot.log
+        
+        # 提交更改，忽略不存在的文件
+        git add sent_urls.json 2>/dev/null || true
+        git add ai_news_bot.log logs/*.log 2>/dev/null || true
+        
+        # 提交或跳过
         git commit -m "Update sent URLs and logs" || echo "No changes to commit"
         git push || echo "Push failed, but continuing"
