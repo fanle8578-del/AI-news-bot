@@ -7,8 +7,34 @@
                 "name": "TechCrunch",
                 "url": "https://techcrunch.com/feed/",
                 "keywords": [
-                    "AI"
-                ]
+                    "OpenAI",
+                    "GPT",
+                    "Anthropic",
+                    "Claude",
+                    "Google AI",
+                    "Meta AI",
+                    "funding",
+                    "Series A",
+                    "GPU",
+                    "AI chips",
+                    "Sora",
+                    "world model"
+                ],
+                "category": "ai_funding"
+            },
+            {
+                "name": "VentureBeat AI",
+                "url": "https://venturebeat.com/category/ai/feed/",
+                "keywords": [
+                    "AI funding",
+                    "AI investment",
+                    "AI startup",
+                    "generative AI",
+                    "OpenAI",
+                    "Anthropic",
+                    "data annotation"
+                ],
+                "category": "ai_funding"
             }
         ],
         "chinese_media": [
@@ -16,19 +42,58 @@
                 "name": "机器之心",
                 "url": "https://www.jiqizhixin.com/rss",
                 "keywords": [
-                    "人工智能"
-                ]
+                    "世界模型",
+                    "大模型",
+                    "算力",
+                    "AI芯片",
+                    "数据标注",
+                    "融资",
+                    "OpenAI",
+                    "Anthropic",
+                    "GPT-5",
+                    "Sora"
+                ],
+                "category": "ai_research"
+            },
+            {
+                "name": "36氪AI",
+                "url": "https://36kr.com/feed",
+                "keywords": [
+                    "人工智能",
+                    "AI融资",
+                    "算力",
+                    "大模型",
+                    "世界模型",
+                    "数据标注",
+                    "AI创业"
+                ],
+                "category": "ai_funding"
+            },
+            {
+                "name": "虎嗅网AI",
+                "url": "https://www.huxiu.com/rss/0.xml",
+                "keywords": [
+                    "AI",
+                    "人工智能",
+                    "融资",
+                    "算力",
+                    "OpenAI",
+                    "大模型",
+                    "AI应用"
+                ],
+                "category": "ai_research"
             }
         ]
     },
     "ai_summary": {
         "api_key": "YOUR_OPENAI_API_KEY",
         "model": "gpt-3.5-turbo",
-        "max_tokens": 50,
+        "max_tokens": 80,
         "temperature": 0.3
     },
     "settings": {
-        "max_news": 5,
-        "duplicate_check_hours": 24
+        "max_news": 10,
+        "duplicate_check_hours": 24,
+        "language": "mixed"
     }
 }
